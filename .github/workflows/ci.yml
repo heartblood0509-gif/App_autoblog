@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.11.7"
+          enable-cache: true
+
+      - name: Pin Python ${{ matrix.python-version }}
+        run: uv python pin ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Ruff — lint
+        run: uv run ruff check src tests
+
+      - name: Ruff — format check
+        run: uv run ruff format --check src tests
+
+      - name: Mypy — strict type check
+        run: uv run mypy src
+
+      - name: Pytest
+        run: uv run pytest -v --tb=short
+        env:
+          PYTHONIOENCODING: utf-8
+
+      - name: Entry point smoke test
+        run: uv run autoblog

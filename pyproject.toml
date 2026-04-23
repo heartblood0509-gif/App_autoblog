@@ -8,9 +8,37 @@ authors = [
     { name = "윤서준", email = "heartblood0509@gmail.com" },
 ]
 dependencies = [
+    # 핵심 (Phase 0~)
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "loguru>=0.7.2",
+    # HTTP / 재시도 (Phase 0 Day 3 PoC 1부터)
+    "httpx>=0.28",
+    "tenacity>=9.0",
+    # 브라우저 자동화 메인 (Phase 0 Day 4 PoC 2부터)
+    "nodriver>=0.39",
+    # OS 자격증명 저장소 (Phase 0 Day 5 PoC 3부터)
+    "keyring>=25.5",
+    # Google Gemini SDK (Day 5 PoC 3부터)
+    "google-genai>=0.3",
+]
+
+[project.optional-dependencies]
+# GUI — Phase 1 시작 시 설치
+gui = [
+    "PySide6>=6.8",
+    "qasync>=0.27,<0.30",  # Qt ↔ asyncio 이벤트 루프 브릿지 (CR-002)
+]
+# 이미지 후처리 — Phase 2
+images = [
+    "Pillow>=11.0",
+    "piexif>=1.1",
+]
+# 브라우저 자동화 폴백 — Phase 1~2
+fallback = [
+    "playwright>=1.48",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.3",
 ]
 
 [project.scripts]
@@ -20,6 +48,7 @@ autoblog = "autoblog.__main__:main"
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
     "ruff>=0.7",
     "mypy>=1.13",
     "pre-commit>=4.0",
@@ -36,14 +65,15 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = [
-    "E",   # pycodestyle errors
-    "F",   # pyflakes
-    "I",   # isort
-    "N",   # pep8-naming
-    "UP",  # pyupgrade
-    "B",   # bugbear
-    "SIM", # simplify
-    "RUF", # ruff-specific
+    "E",     # pycodestyle errors
+    "F",     # pyflakes
+    "I",     # isort
+    "N",     # pep8-naming
+    "UP",    # pyupgrade
+    "B",     # bugbear
+    "SIM",   # simplify
+    "RUF",   # ruff-specific
+    "ASYNC", # async 안티 패턴 (qasync 도입 대비)
 ]
 ignore = [
     "E501",  # line length (ruff format이 처리)
@@ -64,11 +94,21 @@ explicit_package_bases = true
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
-module = ["nodriver.*", "pyperclip.*", "pyautogui.*", "piexif.*"]
+module = [
+    "nodriver.*",
+    "pyperclip.*",
+    "pyautogui.*",
+    "piexif.*",
+    "qasync.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "integration: 실제 외부 API 호출 테스트 (CI 기본 제외)",
+    "e2e: 실제 네이버 발행 테스트 (수동 실행 전용)",
+]

@@ -1,0 +1,36 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.11
+    hooks:
+      - id: ruff-check
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (strict type check)
+        entry: uv run mypy src
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+
+      - id: no-secrets
+        name: 민감정보 누출 방지 (API 키/네이버 쿠키)
+        entry: bash -c 'git diff --cached --name-only | xargs grep -lE "(NID_AUT|NID_SES|AIzaSy[A-Za-z0-9_-]{33}|api_key\s*=\s*\"[^\"]+\"|NAVER_PASSWORD)" 2>/dev/null && echo "민감정보 감지됨. 커밋 중단." && exit 1 || exit 0'
+        language: system
+        pass_filenames: false
