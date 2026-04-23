@@ -124,16 +124,108 @@ Phase 1에서 이 모델로 엄격 파싱 → 스키마 변경 즉시 감지.
 
 ---
 
-## PoC 2 — (예정) 사용자 Chrome 프로필로 네이버 로그인 상태 감지
+## PoC 2 — 네이버 로그인 자동화 + 쿠키 추출 (Playwright 폴백)
 
-**예정일**: Day 4
-**스크립트**: `scripts/poc_session.py` (예정)
-**필요한 것**: 네이버 테스트 계정 1개
+**실행일**: 2026-04-23 (Day 3, 통합 진행)
+**스크립트**: `scripts/poc_session.py` (Playwright 버전)
 
-**검증 항목**:
-- nodriver로 사용자 Chrome 프로필 attach 가능?
-- `https://nid.naver.com/user2/help/myInfo` 방문 시 로그인 상태 자동 판별 가능?
-- `NID_AUT`, `NID_SES` 쿠키 추출 성공?
+### 판정: ✅ **통과 — 단, nodriver 실패 → Playwright 폴백으로 전환**
+
+### 주요 발견
+
+1. **nodriver는 macOS + Chrome 147 환경에서 연결 실패**
+   - `Failed to connect to browser` 반복 발생 (sandbox/CDP 이슈 추정)
+   - Chrome 프로세스 완전 종료, 프로필 락 정리 후에도 재현
+   - CR-002 계획의 **Playwright 폴백으로 전환** → 해결
+   - 사용자 기존 프로젝트 `app-blog2`도 Playwright 스택이라 스택 통일 효과
+
+2. **Playwright + 시스템 Chrome(channel="chrome") + persistent context**
+   - 로그인 페이지 자동 진입
+   - 사용자가 30분 이내 수동 로그인
+   - 쿠키 12개 자동 추출 + JSON 저장
+
+3. **핵심 인증 쿠키 확보 확인**
+   - `NID_AUT` (64자, httpOnly=True) ✓
+   - `NID_SES` (648자, httpOnly=False, 세션 쿠키) ✓
+
+### 주의 사항 (Phase 1 반영)
+
+- **Persistent profile에 세션 쿠키는 저장되지 않음** — `NID_SES`가 브라우저 종료 시 증발
+- 이후 PoC/코드에서는 JSON에 저장한 쿠키를 `context.add_cookies()`로 **수동 주입** 필요
+- 이 패턴을 Phase 1 `NaverSession` 모듈에 구현
+
+### Chrome 잔존 프로세스 문제
+
+- 첫 실행 후 Chrome 프로세스가 완전 종료 안 되면 두 번째 실행 시 프로필 락으로 창 안 뜸
+- 해결: `pkill -9 -f "autoblog/chrome-profiles/naver"` + `rm Singleton*`
+- Phase 1에서 앱 시작 시 자동 정리 로직 추가 필요
+
+### Acceptance Criteria
+
+- [x] Chrome 창이 뜸 (Playwright)
+- [x] 로그인 상태 자동 감지
+- [x] NID_AUT + NID_SES 확보
+- [x] JSON 저장 성공
+
+---
+
+## PoC 4 — 네이버 이미지 업로드 API (부분 성공)
+
+**실행일**: 2026-04-23 (Day 3, PoC 2 직후)
+**스크립트**: `scripts/poc_upload.py` (Playwright context.request 기반)
+
+### 판정: ⚠️ **부분 성공 — 3/4 단계 통과, 최종 업로드만 네이버의 추가 보안으로 차단**
+
+### 단계별 결과
+
+| 단계 | 엔드포인트 | 결과 |
+|---|---|---|
+| 1. blogId 추출 | `blog.naver.com/MyBlog.naver` | ✅ `jjajungma` 확보 |
+| 2. Se-Authorization 토큰 | `blog.naver.com/PostWriteFormSeOptions.naver` | ✅ 180자 토큰 |
+| 3. 업로드 session-key | `platform.editor.naver.com/.../session-key` | ✅ sessionKey 발급 |
+| 4. **이미지 업로드** | `blog.upphoto.naver.com/{sessionKey}/simpleUpload/0` | ❌ `<code>LOGIN</code>` 거부 |
+
+### 시도했지만 해결 안 된 것
+
+- httpx 단일 요청 (Chrome 131 UA + 단순 Referer)
+- httpx 단일 요청 (Chrome 147 UA + PostWriteForm Referer + Origin)
+- Playwright `context.request` + persistent profile (세션 쿠키 증발)
+- Playwright `context.request` + 수동 쿠키 주입 (12개 전부)
+- Playwright `context.request` + 쿠키 + `Se-Authorization` + `Sec-Fetch-*` 헤더
+
+### 원인 분석 (Phase 1 설계에 반영)
+
+네이버 `blog.upphoto.naver.com`은 2025-07 이후 보안 강화로 **순수 HTTP 요청을 거부**하는 것으로 확인됨. viruagent-cli(2026-04)의 단순 fetch 코드가 더 이상 동작하지 않음.
+
+**가장 유력한 해결 경로**:
+- 실제 `PostWriteForm.naver` 에디터 페이지를 **Playwright로 방문**한 상태에서
+- `page.evaluate()` 안에서 **페이지 런타임 JavaScript로 fetch 호출**
+- 이렇게 하면 브라우저가 CORS, 쿠키, Sec-Fetch, 같은 원본 정책을 전부 자동 처리
+- Phase 1의 `ImageUploader` 모듈은 이 구조로 구현 확정
+
+### Phase 1 ImageUploader 아키텍처 (결정)
+
+```
+[PoC 4 교훈 반영한 구조]
+
+ImageUploader:
+  1. Playwright context 유지 (PoC 2의 로그인 세션)
+  2. 백그라운드 탭에서 PostWriteForm.naver 방문 (에디터 세션 초기화)
+  3. page.evaluate() 로 업로드 fetch 수행
+  4. 응답 XML 파싱 → SE3 이미지 컴포넌트 생성
+```
+
+### Acceptance Criteria
+
+- [x] 쿠키 기반 인증으로 blogId/토큰/세션키 확보 (3/4 단계)
+- [ ] 실제 이미지 업로드 성공 (Phase 1에서 page.evaluate 구조로 재시도)
+- [x] 실패 원인 명확히 파악 → Phase 1 설계에 반영
+
+### 배운 점
+
+- viruagent-cli의 단순 HTTP 업로드 코드는 **현재 시점(2026-04)에는 동작하지 않음**
+- 2025-07 네이버 보안 강화 실제 영향 범위 확인
+- Phase 1 `automation/` 모듈은 **순수 HTTP + Playwright 런타임 혼용** 구조 필수
 
 ---
 
