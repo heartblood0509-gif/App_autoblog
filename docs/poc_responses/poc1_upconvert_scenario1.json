@@ -1,0 +1,5 @@
+{
+  "status": 500,
+  "content_type": "application/json",
+  "body": "{\"message\":\"org.springframework.web.bind.MissingServletRequestParameterException: Required String parameter 'userId' is not present\",\"errorCode\":10000,\"httpCode\":500}"
+}
