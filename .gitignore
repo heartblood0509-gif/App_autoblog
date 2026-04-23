@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# uv
+.uv/
+
+# 빌드 / 배포
+build/
+dist/
+wheels/
+*.egg-info/
+*.whl
+
+# 테스트 / 린트 캐시
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# 로컬 데이터 / 민감정보
+.env
+.env.local
+.env.*.local
+*.db
+*.sqlite
+*.sqlite3
+data/
+logs/
+cache/
+*.log
+
+# 사용자 API 키 / 자격증명 (절대 커밋 금지)
+secrets/
+credentials.json
+api_key.txt
+
+# Playwright / 브라우저 아티팩트
+playwright-report/
+test-results/
+blob-report/
+.cache/
+
+# 사용자 개인 프로필 백업
+chrome-profile-backup/
+
+# 임시
+tmp/
+temp/
+*.tmp
+
+# viruagent-cli 분석용 (vendor 폴더는 보통 커밋 안 함)
+vendor/
