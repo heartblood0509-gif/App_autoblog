@@ -158,14 +158,55 @@ Phase 1에서 이 모델로 엄격 파싱 → 스키마 변경 즉시 감지.
 
 ---
 
-## PoC 5 — (예정) qasync로 PySide6 + asyncio 통합
+## PoC 5 — qasync로 PySide6 + asyncio 통합 (CR-002)
 
-**예정일**: Day 6
-**스크립트**: `scripts/poc_qasync.py` (예정)
+**실행일**: 2026-04-23 (Day 3, 순차 진행 중 당겨서 실행)
+**스크립트**: `scripts/poc_qasync.py`
+**실행 명령**: `POC5_AUTO_EXIT=1 uv run python scripts/poc_qasync.py`
 
-**검증 항목**:
-- Qt 창에 버튼 1개, 클릭 시 `httpx.get()` 비동기 호출
-- UI 프리즈 없이 네트워크 응답을 Qt 라벨에 반영
+### 판정: ✅ **통과 — qasync가 실제로 동작함**
+
+### 자동 검증 3단계 모두 성공
+
+1. **이벤트 루프 교체 확인**
+   - `asyncio.get_running_loop()` → `QSelectorEventLoop` 타입
+   - Qt 이벤트 루프가 asyncio 인터페이스로 노출됨 → 기존 `asyncio.create_task` / `await` 패턴 그대로 사용 가능
+
+2. **Qt 타이머 + asyncio.sleep 동시 동작**
+   - `QTimer.singleShot(100, callback)` + `await asyncio.sleep(0.3)` 병행
+   - 타이머 콜백이 정상 발화 + asyncio 대기도 풀림 → UI 이벤트와 async 태스크가 간섭 없이 협력
+
+3. **httpx 비동기 호출**
+   - `async with httpx.AsyncClient() as client: response = await client.get("https://httpbin.org/uuid")`
+   - 성공, uuid 수신 확인
+
+### 의미
+
+CR-002 결정(qasync 채택)이 **실제로 검증됨**. Phase 1 GUI 아키텍처를 이 패턴으로 진행:
+
+```python
+# src/autoblog/app.py 에서 쓸 패턴
+import asyncio
+from PySide6.QtWidgets import QApplication
+from qasync import QEventLoop
+
+def main():
+    app = QApplication(sys.argv)
+    loop = QEventLoop(app)
+    asyncio.set_event_loop(loop)
+    # ... 메인 윈도우 생성 + show()
+    with loop:
+        loop.run_forever()
+```
+
+UI 이벤트 핸들러는 `@asyncSlot()` 데코레이터로 async 함수를 Qt 시그널에 바인딩 가능.
+
+### Acceptance Criteria (모두 통과)
+
+- [x] `QEventLoop`가 `asyncio.get_event_loop()`로 반환됨
+- [x] Qt 타이머와 `asyncio.sleep` 동시 발화
+- [x] 비동기 HTTP 호출 정상 동작
+- [x] 자동 모드로 실행 시 CI에서도 검증 가능 (display 불필요)
 
 ---
 

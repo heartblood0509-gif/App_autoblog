@@ -36,11 +36,7 @@ SAMPLE_HTML = """<h1>카페 다녀왔어요</h1>
 
 def wrap_html(html: str) -> str:
     """naverApiClient.js:267 의 래핑 포맷 그대로."""
-    return (
-        "<html>\n<body>\n<!--StartFragment-->\n"
-        f"{html}"
-        "\n<!--EndFragment-->\n</body>\n</html>"
-    )
+    return f"<html>\n<body>\n<!--StartFragment-->\n{html}\n<!--EndFragment-->\n</body>\n</html>"
 
 
 async def call_api(
@@ -74,6 +70,22 @@ async def call_api(
         "body_text": response.text,
         "body_len": len(response.text),
     }
+
+
+def save_response_files(results: list[dict[str, Any]], out_dir: Path) -> None:
+    """Sync 파일 저장 헬퍼. async 함수에서는 asyncio.to_thread로 호출."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for idx, result in enumerate(results, start=1):
+        out_path = out_dir / f"poc1_upconvert_scenario{idx}.json"
+        payload = {
+            "status": result["status"],
+            "content_type": result["content_type"],
+            "body": result["body_text"],
+        }
+        out_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
 
 
 def summarize_response(label: str, result: dict[str, Any]) -> None:
@@ -119,7 +131,7 @@ async def main() -> int:
     print("PoC 1 — upconvert.editor.naver.com/blog/html/components")
     print("=" * 60)
     print(f"\nURL         : {URL}")
-    print(f"샘플 HTML    : 5개 요소 (h1 + p*3 + strong)")
+    print("샘플 HTML    : 5개 요소 (h1 + p*3 + strong)")
     print(f"타임아웃     : {TIMEOUT_SEC}초")
 
     # 시나리오 1: 쿠키 없이, userId 없이
@@ -138,20 +150,10 @@ async def main() -> int:
         return 1
     summarize_response("시나리오 2: 쿠키 없음 + userId=testblog", result2)
 
-    # 결과를 파일로 저장 (Day 7 회고 자료)
+    # 결과를 파일로 저장 (Day 7 회고 자료).
+    # pathlib / file write는 blocking I/O라서 asyncio.to_thread로 감쌈 (ASYNC240 회피).
     out_dir = Path("docs/poc_responses")
-    out_dir.mkdir(parents=True, exist_ok=True)
-    for idx, result in enumerate([result1, result2], start=1):
-        out_path = out_dir / f"poc1_upconvert_scenario{idx}.json"
-        payload = {
-            "status": result["status"],
-            "content_type": result["content_type"],
-            "body": result["body_text"],
-        }
-        out_path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+    await asyncio.to_thread(save_response_files, [result1, result2], out_dir)
     print(f"\n✓ 원본 응답 저장됨: {out_dir}/")
 
     # 판정

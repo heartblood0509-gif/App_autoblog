@@ -16,10 +16,10 @@ uv run python scripts/poc_upconvert.py
 | 파일 | 검증 내용 | 필요한 것 | 상태 |
 |---|---|---|---|
 | `poc_upconvert.py` | upconvert.editor.naver.com API 동작 | (없음) | ✅ 통과 |
-| `poc_session.py` | 네이버 로그인 자동화 / 쿠키 추출 | 네이버 테스트 계정 | 작성 예정 |
-| `poc_gemini.py` | Gemini 2.5 + Nano Banana 2 API | 사용자 Google API 키 | 작성 예정 |
-| `poc_upload.py` | 이미지 업로드 (blog.upphoto.naver.com) | PoC 2 쿠키 + PoC 3 이미지 | 작성 예정 |
-| `poc_qasync.py` | PySide6 + asyncio 통합 검증 | (없음) | 작성 예정 |
+| `poc_session.py` | 네이버 로그인 자동화 / 쿠키 추출 | 네이버 테스트 계정 | ⏳ 실행 대기 (사용자 계정 필요) |
+| `poc_gemini.py` | Gemini 2.5 + Nano Banana 2 API | 사용자 Google API 키 | ⏳ 실행 대기 (사용자 API 키 필요) |
+| `poc_upload.py` | 이미지 업로드 (blog.upphoto.naver.com) | PoC 2 쿠키 + PoC 3 이미지 | ⏳ 실행 대기 (PoC 2+3 선행) |
+| `poc_qasync.py` | PySide6 + asyncio 통합 검증 (GUI/자동 모드) | `uv sync --extra gui` | ✅ 통과 (자동 모드) |
 
 ## PoC 스크립트 작성 규칙
 
